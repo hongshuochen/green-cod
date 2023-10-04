@@ -1,4 +1,7 @@
-# splicing
+# Green COD
+
+Please download the data from https://mhaiyang.github.io/CVPR2021_PFNet/index.html and put it in the `data` folder.
+
 
 ## Setup
 ```bash
