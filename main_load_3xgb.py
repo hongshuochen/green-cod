@@ -202,6 +202,7 @@ if __name__ == "__main__":
         peak_memory()
 
         params = {
+            "gpu_id": args["gpu_id"],
             "tree_method": "gpu_hist",
             "objective": "binary:logistic",
             "eval_metric": ["error", "rmse", "logloss", "mae"],
