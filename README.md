@@ -1,6 +1,6 @@
 # Green COD
 
-Please download the data from https://mhaiyang.github.io/CVPR2021_PFNet/index.html and put it in the `data` folder.
+Please download the data from https://hongshuochen.com/GreenCOD/ and put it in the `data` folder.
 
 
 ## Setup
