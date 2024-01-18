@@ -5,7 +5,7 @@ Please download the data from https://hongshuochen.com/GreenCOD/ and put it in t
 
 ## Setup
 ```bash
-conda create --name cod
+conda create --name cod python=3.10
 conda activate cod
 conda install -c anaconda pip
 pip3 install torch torchvision torchaudio
