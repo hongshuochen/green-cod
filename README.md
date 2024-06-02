@@ -1,6 +1,6 @@
 # Green COD
 
-Please download the data from https://hongshuochen.com/GreenCOD/ and put it in the `data` folder.
+Please download the data from https://greencod.ai/#dataset-section/ and put it in the `data` folder.
 
 
 ## Setup
@@ -17,6 +17,10 @@ conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
 ```
 
 ## Inference
+### Using ONNX.JS on CPU
+The code and model is available at https://github.com/hongshuochen/greencod.ai
+
+### Using GPU/CPU
 ```bash 
 # If you do not have groundtruth
 # 1000T-D3 (1000 trees, depth 3)
@@ -36,14 +40,15 @@ python infer.py --input_folder data/TestDataset/COD10K/Imgs \
                 --model_folder "ckpt/EfficientNetB4_672_42_42_84_168_1000/2023-10-23 00:30:50.619529" --cupy \
                 --output_folder output
 
-# 10000T-D6 (10000 trees, depth 6)
+# If you want to use CPU
+# 1000T-D3 (1000 trees, depth 3)
 python infer.py --input_folder data/TestDataset/COD10K/Imgs \
                 --target_folder data/TestDataset/COD10K/GT \
-                --model_folder "ckpt/EfficientNetB4_672_42_42_84_168_10000_6/2023-10-24 15:34:37.433389" --cupy \
+                --model_folder "ckpt/EfficientNetB4_672_42_42_84_168_1000/2023-10-23 00:30:50.619529" --cpu \
                 --output_folder output
 ```
 ```bash
-# match the ablation study in paper 
+# match the ablation study in the paper 
 bash run.sh
 ```
 
