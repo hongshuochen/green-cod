@@ -26,9 +26,9 @@ class SingleXGBoost:
             X = xgb.DMatrix(X)
         if iteration_range is None:
             iteration_range = (0, self.bst.best_iteration+1)
-        print(iteration_range)
+        # print(iteration_range)
         output = self.bst.predict(X, iteration_range=iteration_range)
-        print("XGBoost Predict Finished in", time.time() - start, "seconds.")
+        # print("XGBoost Predict Finished in", time.time() - start, "seconds.")
         return output
     
     def inplace_predict(self, X, iteration_range=None):
@@ -61,7 +61,7 @@ class SingleXGBoost:
         plt.legend()
         if path is not None:
             plt.savefig(path)
-            plt.show()
+            # plt.show()
             plt.close()
         else:
             plt.show()

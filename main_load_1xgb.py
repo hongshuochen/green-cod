@@ -30,11 +30,11 @@ from config import cod_training_root, cod10k_path
 from datasets import ImageFolder
 from misc import AvgMeter, check_mkdir, peak_memory, get_train_val_index
 from misc import save_model, load_model, write
-from resize import Resize
 from single_xgboost import SingleXGBoost
 from arguments import parse_arguments
 from features import image_features, prob_features
 from fastforest import fast
+from tee import Tee
 
 def feature_extraction(models, args, data_loader, epoch_num=1):
     X_train = None
@@ -43,7 +43,7 @@ def feature_extraction(models, args, data_loader, epoch_num=1):
     cur = 0
     for epoch in range(epoch_num):
         for images, targets in tqdm(data_loader):
-            print(images.shape, targets.shape)
+            # print(images.shape, targets.shape)
             images = images.cuda(args["gpu_id"])
             with torch.no_grad():
                 features = image_features(models['backbone'], images, args["feature_shape_1"], args["start_layer_1"], args["end_layer_1"], all_size=args['all_size_1'], equal=args['equal_1'])
@@ -51,9 +51,10 @@ def feature_extraction(models, args, data_loader, epoch_num=1):
                 features = image_features(models['backbone'], images, args["feature_shape_2"], args["start_layer_2"], args["end_layer_2"], all_size=args['all_size_2'], equal=args['equal_2'])
                 features = prob_features(features, y_prev_train, args["prob_kernel_size_2"], args["feature_shape_1"], args["feature_shape_2"], args['prob_only_2'])
                 
-            targets = Resize(size=(args["feature_shape_2"], args["feature_shape_2"]))(targets)
+            targets = F.interpolate(targets, size=(args["feature_shape_2"], args["feature_shape_2"]), mode="bicubic")
+            targets = torch.clamp(targets, min=0, max=1)
             targets = targets.flatten().numpy()
-            print(features.shape, targets.shape)
+            # print(features.shape, targets.shape)
             
             if X_train is None:
                 X_train = np.zeros((num_samples, features.shape[1]), dtype=np.float32)
@@ -81,7 +82,6 @@ def feature_extraction(models, args, data_loader, epoch_num=1):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    pprint(args)
     
     # Path
     ckpt_path = args["ckpt_path"]
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     shutil.copy2(sys.argv[0], save_path)
     out_path = os.path.join(save_path, "out.txt")
     file = open(out_path, "w")
-    sys.stdout = file
+    sys.stdout = Tee(sys.stdout, file)
     full_command = " ".join(sys.argv)
     print(cur)
     print("python " + full_command)
@@ -213,7 +213,6 @@ if __name__ == "__main__":
         # scheduler = xgb.callback.LearningRateScheduler(lambda epoch: params["eta"] * decay_rate ** epoch)
 
         sxgb = SingleXGBoost(params, num_boost_round, early_stopping_rounds)
-        peak_memory()
         start = time.time()
         sxgb.fit(DMatrix_train, DMatrix_val)
         print("Finished in", time.time() - start, "seconds.")
@@ -327,41 +326,33 @@ if __name__ == "__main__":
     neg_mae = 0
     pos_len = 0
     neg_len = 0
-    mae_test_advanced = 0
     num_images = 0
     prob = []
     for images, targets in tqdm(test_loader):
         num_images += len(images)
-        print(images.shape, targets.shape)
+        # print(images.shape, targets.shape)
         images = images.cuda(args["gpu_id"])
         with torch.no_grad():
             features = image_features(model, images, args["feature_shape_1"], args["start_layer_1"], args["end_layer_1"], all_size=args["all_size_1"], equal=args["equal_1"])
             
             start = time.time()
             y_prev_train = models["prev_sxgb"].predict(features)
-            print("XGBoost Predict Finished in", time.time() - start, "seconds.")
+            # print("XGBoost Predict Finished in", time.time() - start, "seconds.")
             features = image_features(model, images, args["feature_shape_2"], args["start_layer_2"], args["end_layer_2"], all_size=args["all_size_2"], equal=args["equal_2"])
             features = prob_features(features, y_prev_train, args["prob_kernel_size_2"], args["feature_shape_1"], args["feature_shape_2"], args["prob_only_2"])
         
         start = time.time()
         y_pred = sxgb.predict(features)
-        print("XGBoost Predict Finished in", time.time() - start, "seconds.")
+        # print("XGBoost Predict Finished in", time.time() - start, "seconds.")
         y_pred = torch.from_numpy(y_pred)
-        print(y_pred.shape)
         y_pred = y_pred.reshape(-1, 1, args["feature_shape_2"], args["feature_shape_2"])
-        print(y_pred.shape)
         prob.append(y_pred)
-        y_pred = Resize(size=targets.shape[-2:])(y_pred)
-        print(y_pred.shape)
+        y_pred = F.interpolate(y_pred, size=targets.shape[-2:], mode="bicubic")
+        y_pred = torch.clamp(y_pred, min=0, max=1)
         y_pred = y_pred.flatten().numpy()
-        print(y_pred.shape)
 
         targets = targets.flatten().numpy()
-        print(targets.shape)
-        print(targets.max(), targets.min())
-        print(y_pred.max(), y_pred.min())
         y_pred = np.clip(y_pred, 1e-7, 1 - 1e-7)
-        print(y_pred.max(), y_pred.min())
 
         mae_test += np.sum(np.abs(y_pred - targets))
         mae_test_binary += np.sum(np.abs((y_pred > 0.5) - targets))
@@ -373,9 +364,6 @@ if __name__ == "__main__":
         pos_len += np.sum(targets > 0.5)
         neg_len += np.sum(targets <= 0.5)
         logloss_test += np.sum(-(targets * np.log(y_pred) + (1 - targets) * np.log(1 - y_pred)))
-        y_pred_advanced = np.array(y_pred)
-        y_pred_advanced[y_pred_advanced <= 0.5] = 0
-        mae_test_advanced += np.sum(np.abs(y_pred_advanced - targets))
         if args["debug"]:
             break
     if not args["debug"]:
@@ -388,7 +376,6 @@ if __name__ == "__main__":
     baseline /= num_images * args["scale"] * args["scale"]
     pos_mae /= pos_len
     neg_mae /= neg_len
-    mae_test_advanced /= num_images * args["scale"] * args["scale"]
     print(
         "mse_test: ",
         mse_test,
@@ -406,12 +393,12 @@ if __name__ == "__main__":
     )
     print("baseline: ", baseline, "pos_mae: ", pos_mae, "neg_mae: ", neg_mae)
     print(
-        "mae_test_binary: ", mae_test_binary, "mae_test_advanced: ", mae_test_advanced
+        "mae_test_binary: ", mae_test_binary
     )
     write(
         log_path,
-        "baseline: %f, pos_mae: %f, neg_mae: %f, mae_test_binary %f, mae_test_advanced: %f\n"
-        % (baseline, pos_mae, neg_mae, mae_test_binary, mae_test_advanced),
+        "baseline: %f, pos_mae: %f, neg_mae: %f\nmae_test_binary %f\n"
+        % (baseline, pos_mae, neg_mae, mae_test_binary),
     )
     prob = torch.cat(prob, dim=0)
     prob = prob.numpy()
