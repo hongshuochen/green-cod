@@ -18,6 +18,8 @@ conda install -c "nvidia/label/cuda-11.8.0" cuda-toolkit
 
 ## Inference
 ### Using ONNX.JS on CPU
+For single image: https://greencod.ai/demo
+For multiple images: https://greencod.ai/demo_folder
 The code and model is available at https://github.com/hongshuochen/greencod.ai
 
 ### Using GPU/CPU
